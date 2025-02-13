@@ -1,25 +1,30 @@
-const { Doctor, Patient } = require('../models/User');
+const User = require('../models/User'); // Single User model
 
+// Assign a doctor to a patient
 const assignDoctorService = async (patientId, doctorId) => {
-    const doctor = await Doctor.findById(doctorId);
-    const patient = await Patient.findById(patientId);
+    const doctor = await User.findOne({ _id: doctorId, role: 'doctor' });
+    const patient = await User.findOne({ _id: patientId, role: 'patient' });
 
     if (!doctor || !patient) {
         throw new Error('Doctor or Patient not found');
     }
 
-    patient.doctor = doctorId;
+    // Assign the doctor to the patient
+    patient.doctor = doctor._id;
     await patient.save();
 
-    doctor.patients.push(patientId);
+    // Add patient to the doctor's patient list
+    doctor.patients.push(patient._id);
     await doctor.save();
 
     return { message: 'Doctor assigned successfully' };
 };
 
+// Get all patients assigned to a doctor
 const getDoctorPatientsService = async (doctorId) => {
-    const doctor = await Doctor.findOne({ user: doctorId }).populate('patients', 'user');
+    const doctor = await User.findOne({ _id: doctorId, role: 'doctor' }).populate('patients', 'name email');
     if (!doctor) throw new Error('Doctor not found');
+    
     return doctor.patients;
 };
 
