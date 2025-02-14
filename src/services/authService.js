@@ -1,17 +1,12 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // Import all models
+const User = require('../models/User'); 
 const Doctor = require('../models/Doctor')
 const Patient = require('../models/Patient')
+const { generateToken } = require('../utils/jwt')
 const dotenv = require('dotenv');
 dotenv.config();
 
-const generateToken = (user) => {
-    return jwt.sign(
-        { id: user._id, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-    );
-};
+
 
 const registerUser = async (name, email, password, role, specialization, extraData = {}) => {
     const existingUser = await User.findOne({ email });

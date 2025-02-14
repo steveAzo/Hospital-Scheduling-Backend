@@ -37,7 +37,7 @@ src/
 │── models/         # Mongoose models
 │── routes/         # API route definitions
 │── middleware/     # Authentication and request validation
-│── utils/          # Helper functions (e.g., encryption, AI integration)
+│── utils/          # Helper functions (e.g., encryption, AI integration, database)
 │── config/         # Configuration files (e.g., database, JWT secrets)
 │── cronJobs/       # Scheduled tasks (e.g., reminders)
 │── server.js       # Main application entry point
@@ -66,13 +66,58 @@ const UserSchema = new mongoose.Schema({
 #### **Doctor Notes Model** (`models/DoctorNote.js`)
 ```js
 const DoctorNoteSchema = new mongoose.Schema({
-    patient: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    note: { type: String, required: true },
-    encrypted: Boolean,
-    createdAt: { type: Date, default: Date.now },
-});
+    doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, 
+    patient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, 
+    encryptedNote: { type: String, required: true }, 
+    iv: { type: String, required: true }, 
+    checklist: [{ type: String }], 
+    plan: [
+        {
+            task: String,
+            frequency: String, 
+            duration: Number,
+        }
+    ],
+}, { timestamps: true });
+
+DoctorNoteSchema.methods.encryptNote = function (plainText) {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(process.env.ENCRYPTION_KEY, 'hex'), iv);
+    let encrypted = cipher.update(plainText, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    this.encryptedNote = encrypted;
+    this.iv = iv.toString('hex');
+};
+
+DoctorNoteSchema.methods.decryptNote = function () {
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(process.env.ENCRYPTION_KEY, 'hex'), Buffer.from(this.iv, 'hex'));
+    let decrypted = decipher.update(this.encryptedNote, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+};
+
 ```
+
+### Data Encryption for Doctor Notes
+
+To ensure **patient confidentiality and data security**, doctor notes are encrypted before storage. We use **AES-256 encryption**, a widely accepted industry standard for securing sensitive data.
+
+####  How It Works:
+1. **Encryption**:  
+   - Before saving, the doctor’s note is encrypted using **AES-256-CBC**.  
+   - A **random IV (Initialization Vector)** is generated for each encryption to enhance security.  
+   - The **encryption key** is securely stored in environment variables (`process.env.ENCRYPTION_KEY`).
+
+2. **Decryption**:  
+   - When a **doctor retrieves notes**, the system decrypts them using the stored key and IV.  
+   - Only **authorized users (doctor or patient)** can access the decrypted content.
+
+####  Why AES-256?  
+**Strong Security** – Resistant to brute-force attacks.  
+**Fast Performance** – Efficient even for large texts.  
+**Widely Used** – Standard encryption for sensitive data.
+
+---
 ---
 
 ## **Authentication (JWT)**
@@ -97,6 +142,20 @@ const authenticate = (roles = []) => (req, res, next) => {
     }
 };
 ```
+
+## User Model & Role-Based Access Control (RBAC)
+
+### Why We Use the Discriminator Approach  
+In our system, we have **different types of users** with distinct roles and permissions:  
+- **Doctors** – Can manage patient notes, view assigned patients, and create treatment plans.  
+- **Patients** – Can check in, receive reminders, and view their own medical records.  
+-  **Admins (if needed in the future)** – Can oversee system operations.
+
+Since these user types **share common attributes** (e.g., `email`, `password`, `name`) but also have **role-specific data**, we use **MongoDB discriminators**.  
+This allows **efficient schema inheritance**, avoiding redundancy while keeping role-specific fields **separate yet linked**.
+
+---
+
 
 ---
 
@@ -151,19 +210,25 @@ const authenticate = (roles = []) => (req, res, next) => {
 5. **Data is stored securely** (encryption applied if required)
 
 ```js
-const submitDoctorNote = async (req, res) => {
-    const { patientId, note } = req.body;
-    
-    // Step 1: AI processing
-    const actionableSteps = await analyzeNoteWithAI(note);
-    
-    // Step 2: Save note
-    const savedNote = await DoctorNote.create({ patient: patientId, doctor: req.user.id, note });
-    
-    // Step 3: Schedule Reminders
-    scheduleReminders(patientId, actionableSteps);
+const submitDoctorNote = async (doctorId, patientId, note) => {
+    const doctorNote = new DoctorNotes({ doctor: doctorId, patient: patientId });
 
-    res.status(201).json({ message: 'Note submitted successfully', actionableSteps });
+    doctorNote.encryptNote(note);
+    console.log(doctorNote)
+    await doctorNote.save();
+
+    // Decrypt the note for AI processing
+    const decryptedNote = doctorNote.decryptNote();
+
+
+    // Delete any previous actionable steps and reminders for this patient
+    await ActionableSteps.deleteMany({ patient: patientId });
+    await Reminder.deleteMany({ patient: patientId });
+
+    // Send decrypted note to AI, extract checklist & plan
+    const { checklist, plan } = await processDoctorNote(patientId, doctorNote._id, decryptedNote);
+
+    return { message: 'Doctor note submitted successfully', checklist, plan };
 };
 ```
 
@@ -183,6 +248,8 @@ npm install
 ```env
 MONGO_URI=<your_mongodb_uri>
 JWT_SECRET=<your_jwt_secret>
+ENCRYPTION_KEY=<your_encryption_key>
+GEMINI_API=<your_gemini_api_key>
 ```
 ### **4. Start Server**
 ```sh
@@ -191,5 +258,5 @@ npm start
 ---
 
 ### **Conclusion**
-This documentation ensures clarity for **frontend developers and graders**. Let me know if you need refinements! 🚀
+This documentation ensures clarity for **frontend developers and graders** and the **Quality Assurance Team**.
 

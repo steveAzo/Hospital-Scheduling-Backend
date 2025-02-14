@@ -1,5 +1,5 @@
 const DoctorNotes = require('../models/DoctorNote');
-const  { processDoctorNote }  = require('../services/aiService')
+const  { processDoctorNote }  = require('../utils/aiService')
 const ActionableSteps = require('../models/ActionableSteps')
 const Reminder = require('../models/Reminder')
 

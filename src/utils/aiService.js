@@ -1,6 +1,6 @@
 const axios = require('axios');
 const ActionableSteps = require('../models/ActionableSteps');
-const { scheduleRemindersForPlan } = require('./reminderService')
+const { scheduleRemindersForPlan } = require('../services/reminderService')
 const dotenv = require('dotenv');
 dotenv.config();
 
