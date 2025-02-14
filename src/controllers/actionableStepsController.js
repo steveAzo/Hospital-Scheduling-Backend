@@ -2,7 +2,7 @@ const { getPatientSteps } = require('../services/actionableStepsService');
 
 const getPatientActionableSteps = async (req, res) => {
     try {
-        const { patientId } = req.user.params;
+        const patientId = req.user.id;
 
         const steps = await getPatientSteps(patientId);
 

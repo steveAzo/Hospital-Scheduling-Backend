@@ -1,5 +1,6 @@
 const axios = require('axios');
 const ActionableSteps = require('../models/ActionableSteps');
+const { scheduleRemindersForPlan } = require('./reminderService')
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -62,6 +63,10 @@ const processDoctorNote = async (patientId, doctorNoteId, decryptedNote) => {
 
         // Save to MongoDB
         await ActionableSteps.create({ patient: patientId, doctorNote: doctorNoteId, checklist, plan });
+
+        // Schedule the reminders
+        console.log('function called')
+        await scheduleRemindersForPlan(patientId, plan);
 
         return { checklist, plan };
     } catch (error) {

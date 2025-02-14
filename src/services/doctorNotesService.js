@@ -1,6 +1,7 @@
 const DoctorNotes = require('../models/DoctorNote');
 const  { processDoctorNote }  = require('../services/aiService')
 const ActionableSteps = require('../models/ActionableSteps')
+const Reminder = require('../models/Reminder')
 
 
 const createDoctorNote = async (doctorId, patientId, note) => {
@@ -29,8 +30,9 @@ const submitDoctorNote = async (doctorId, patientId, note) => {
     const decryptedNote = doctorNote.decryptNote();
 
 
-    // Delete any previous actionable steps for this patient
+    // Delete any previous actionable steps and reminders for this patient
     await ActionableSteps.deleteMany({ patient: patientId });
+    await Reminder.deleteMany({ patient: patientId });
 
     // Send decrypted note to AI, extract checklist & plan
     const { checklist, plan } = await processDoctorNote(patientId, doctorNote._id, decryptedNote);
