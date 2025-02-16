@@ -22,7 +22,11 @@ const submitDoctorNote = async (req, res) => {
         const doctorId = req.user.id; 
 
         const result = await doctorNotesService.submitDoctorNote(doctorId, patientId, note);
-        res.status(201).json({ message: 'Doctor note submitted successfully', ...result });
+        
+        if (!result) {
+            res.status(400).json({ message: 'could not add Doctor notes' })
+        }
+        res.status(201).json({ message: 'Doctor note added, actionable steps extracted, and reminders scheduled.'});
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
